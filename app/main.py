@@ -58,8 +58,13 @@ ALLOWED_ORIGINS = _csv_env(
 
 PROVENANCE = {
     "provider": "OECD",
-    "dataset": "Bilateral merchandise trade statistics",
+    "dataset": "Balanced International Merchandise Trade Statistics (BIMTS)",
+    "edition": "HS 2017",
     "coverage": "1995-2024 where available",
+    "source_url": "https://data-explorer.oecd.org/",
+    "dataflow_url": "https://sdmx.oecd.org/sti-public/rest/dataflow/OECD.SDD.TPS/DSD_BIMTS_6D@DF_BIMTS_HS2017_6D/1.0",
+    "terms_url": "https://www.oecd.org/termsandconditions/",
+    "notice": "Values may include OECD adjustments and balancing; see the BIMTS methodology.",
 }
 
 CountryIso3 = Annotated[
@@ -349,7 +354,8 @@ async def get_lane_page(
     url = f"{PUBLIC_SITE_ORIGIN}{route}/index.json"
     payload = await _get_json(url)
     result = _public_payload(payload)
-    result["source_url"] = f"{PUBLIC_SITE_ORIGIN}{route}"
+    result["url"] = f"{PUBLIC_SITE_ORIGIN}{route}"
+    result["source_url"] = result["url"]
     return result
 
 

@@ -1,7 +1,7 @@
 import pytest
 from starlette.testclient import TestClient
 
-from app.main import app
+from app.main import PROVENANCE, app
 
 
 @pytest.fixture(scope="module")
@@ -20,6 +20,13 @@ def test_discovery_metadata_is_public(client: TestClient) -> None:
     response = client.get("/.well-known/mcp.json")
     assert response.status_code == 200
     assert response.json()["url"].endswith("/mcp")
+
+
+def test_provenance_identifies_the_public_dataset() -> None:
+    assert PROVENANCE["dataset"] == "Balanced International Merchandise Trade Statistics (BIMTS)"
+    assert PROVENANCE["edition"] == "HS 2017"
+    assert PROVENANCE["dataflow_url"].startswith("https://sdmx.oecd.org/")
+    assert PROVENANCE["terms_url"] == "https://www.oecd.org/termsandconditions/"
 
 
 def test_initialize_and_tools_list(client: TestClient) -> None:
