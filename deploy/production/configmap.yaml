@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: trade-mcp-config
+  namespace: trade-mcp
+data:
+  TRADE_SERVICE_URL: "http://trade-service.trade-service.svc.cluster.local:8000"
+  MCP_PUBLIC_URL: "https://mcp.yugalinks.com"
+  PUBLIC_SITE_ORIGIN: "https://www.yugalinks.com"
+  MCP_ALLOWED_HOSTS: "mcp.yugalinks.com,mcp.yugalinks.com:*"
+  MCP_ALLOWED_ORIGINS: "https://www.yugalinks.com,https://claude.ai,https://chatgpt.com,https://www.chatgpt.com,https://copilot.microsoft.com,https://vscode.dev"
+  MCP_RATE_LIMIT: "60"
+  MCP_RATE_WINDOW_SECONDS: "60"
+  MCP_MAX_BODY_BYTES: "131072"
