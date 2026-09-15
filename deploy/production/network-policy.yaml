@@ -1,0 +1,92 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: trade-mcp-default-deny-ingress
+  namespace: trade-mcp
+spec:
+  podSelector:
+    matchLabels:
+      app: trade-mcp
+  policyTypes:
+    - Ingress
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: trade-mcp-default-deny-egress
+  namespace: trade-mcp
+spec:
+  podSelector:
+    matchLabels:
+      app: trade-mcp
+  policyTypes:
+    - Egress
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: trade-mcp-allow-cloudflare-ingress
+  namespace: trade-mcp
+spec:
+  podSelector:
+    matchLabels:
+      app: trade-mcp
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: cloudflare
+        - ipBlock:
+            cidr: 10.20.0.0/16
+      ports:
+        - protocol: TCP
+          port: 8002
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: trade-mcp-allow-egress
+  namespace: trade-mcp
+spec:
+  podSelector:
+    matchLabels:
+      app: trade-mcp
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: trade-service
+          podSelector:
+            matchLabels:
+              app: trade-service
+      ports:
+        - protocol: TCP
+          port: 8000
+    - to:
+        - ipBlock:
+            cidr: 10.20.7.0/24
+      ports:
+        - protocol: TCP
+          port: 6380
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+      ports:
+        - protocol: TCP
+          port: 443

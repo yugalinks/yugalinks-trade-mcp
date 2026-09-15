@@ -7,3 +7,6 @@ resources:
   - deployment.yaml
   - hpa.yaml
   - pdb.yaml
+  - network-policy.yaml
+  - cloudflared-www-config.yaml
+  - trade-service-network-policy.yaml

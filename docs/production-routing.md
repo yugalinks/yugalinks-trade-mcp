@@ -1,17 +1,11 @@
 # Production Routing
 
-The MCP service is intended to use the existing Cloudflare Tunnel rather than a new public load balancer.
+The MCP service uses the existing Cloudflare Tunnel rather than a new public load balancer.
 
 The tunnel configuration routes:
 
 ```text
-mcp.yugalinks.com -> trade-mcp.trade-mcp.svc.cluster.local:8002
-```
-
-Before rollout, create the DNS route for the existing tunnel from an authenticated operator session:
-
-```bash
-cloudflared tunnel route dns 3a212204-f9b4-4aef-bc5d-7e3d39c28361 mcp.yugalinks.com
+commerce-mcp.yugalinks.com -> trade-mcp.trade-mcp.svc.cluster.local:8002
 ```
 
 The `trade-mcp-env` Secret must exist in the `trade-mcp` namespace with at least:
@@ -19,11 +13,29 @@ The `trade-mcp-env` Secret must exist in the `trade-mcp` namespace with at least
 - `TRADE_SERVICE_API_KEY`: the existing trade-service service key.
 - `REDIS_URL`: optional shared Redis URL for cross-replica rate limiting.
 
-Apply the service manifests only after the image is available in GHCR:
+The GitHub Actions `Trade MCP CI` workflow owns the application rollout. It runs tests and
+manifest validation, publishes an immutable `sha-<commit>` image to GHCR, attaches the
+production manifests through Azure's AKS command runner, applies them, waits for the MCP
+rollout, probes the private adapter, refreshes the existing Cloudflare tunnel workload, creates
+or updates the canonical Cloudflare DNS record through the Cloudflare API, and runs the complete
+public HTTPS preflight. Use a push to `main`, or manually dispatch the workflow from `main` with
+`deploy_production=true`.
 
-```bash
-kubectl apply -k trade-mcp/deploy/production
-kubectl -n trade-mcp rollout status deployment/trade-mcp
-```
+The production GitHub environment must provide:
 
-This file is preparation only. No DNS, Kubernetes, or Cloudflare change was executed by the development workflow.
+- `GHCR_USERNAME` and `GHCR_PUSH_TOKEN` repository secrets.
+- `CLOUDFLARE_API_TOKEN` production environment secret with DNS edit permission for the zone.
+- `AZURE_CLIENT_ID`, `AZURE_TENANT_ID`, `AZURE_SUBSCRIPTION_ID`, `AKS_RESOURCE_GROUP`, and `AKS_CLUSTER_NAME` environment variables.
+- `CLOUDFLARE_ZONE_ID` and `CLOUDFLARE_TUNNEL_ID` production environment variables.
+- The existing `ghcr-registry-secret` and `trade-mcp-env` Kubernetes Secrets.
+- The existing `trade-service-env` Kubernetes Secret.
+- A `cloudflared` Deployment, StatefulSet, or DaemonSet in the `cloudflare` namespace labeled `app=cloudflared`.
+
+The workflow also applies the least-privilege `trade-service-allow-trade-mcp` NetworkPolicy,
+allowing only the MCP namespace to call the trade-service HTTP port, and probes the private
+adapter through the deployed MCP pod before refreshing the public tunnel.
+
+Do not apply the service manifests, edit the tunnel ConfigMap, or create DNS records from a
+workstation. The protected production workflow is the only release path.
+
+No DNS, Kubernetes, or Cloudflare change was executed while preparing this release.

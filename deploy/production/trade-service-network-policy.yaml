@@ -1,0 +1,19 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: trade-service-allow-trade-mcp
+  namespace: trade-service
+spec:
+  podSelector:
+    matchLabels:
+      app: trade-service
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: trade-mcp
+      ports:
+        - protocol: TCP
+          port: 8000

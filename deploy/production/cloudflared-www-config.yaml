@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cloudflared-www-config
+  namespace: cloudflare
+data:
+  config.yaml: |
+    tunnel: 3a212204-f9b4-4aef-bc5d-7e3d39c28361
+    credentials-file: /etc/cloudflared/creds/credentials.json
+    ingress:
+      - hostname: commerce-mcp.yugalinks.com
+        service: http://trade-mcp.trade-mcp.svc.cluster.local:8002
+      - hostname: www.yugalinks.com
+        service: http://webapp.webapp.svc.cluster.local:80
+      - hostname: yugalinks.com
+        service: http://webapp.webapp.svc.cluster.local:80
+      - service: http_status:404

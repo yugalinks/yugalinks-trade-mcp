@@ -2,12 +2,35 @@ name: Trade MCP CI
 
 on:
   workflow_dispatch:
+    inputs:
+      deploy_production:
+        description: "Deploy the immutable image to the production AKS namespace"
+        required: true
+        default: false
+        type: boolean
   push:
     branches: [main]
+    paths:
+      - "app/**"
+      - "tests/**"
+      - "deploy/**"
+      - "preflight.py"
+      - "Dockerfile"
+      - "requirements*.txt"
+      - ".github/workflows/trade-mcp.yml"
   pull_request:
+    paths:
+      - "app/**"
+      - "tests/**"
+      - "deploy/**"
+      - "preflight.py"
+      - "Dockerfile"
+      - "requirements*.txt"
+      - ".github/workflows/trade-mcp.yml"
 
 permissions:
   contents: read
+  packages: write
   id-token: write
 
 env:
@@ -17,58 +40,175 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+
       - name: Install test dependencies
-        run: python -m pip install --disable-pip-version-check -r requirements-dev.txt
-      - name: Run protocol tests
-        env:
-          PYTHONPATH: .
+        run: python -m pip install --upgrade pip && python -m pip install -r requirements-dev.txt
+
+      - name: Run tests
         run: python -m pytest -q
 
+      - name: Validate production manifests
+        uses: azure/setup-kubectl@v4
+        with:
+          version: v1.31.4
+
+      - run: kubectl kustomize deploy/production >/dev/null
+
   build-and-push:
+    if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.deploy_production)
     needs: test
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: docker/setup-buildx-action@v3
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
       - name: Log in to GHCR
-        if: github.event_name == 'push'
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ secrets.GHCR_USERNAME }}
           password: ${{ secrets.GHCR_PUSH_TOKEN }}
-      - name: Build and push
+
+      - name: Build and push immutable image
         uses: docker/build-push-action@v6
         with:
           context: .
           file: ./Dockerfile
-          push: ${{ github.event_name == 'push' }}
-          tags: |
-            ${{ env.IMAGE }}:sha-${{ github.sha }}
-            ${{ env.IMAGE }}:latest
+          push: true
+          tags: ${{ env.IMAGE }}:sha-${{ github.sha }}
 
   deploy-production:
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: >-
+      (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
+      (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && inputs.deploy_production)
     needs: build-and-push
     runs-on: ubuntu-latest
     environment: production
     steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
       - name: Azure login (OIDC)
         uses: azure/login@v2
         with:
           client-id: ${{ vars.AZURE_CLIENT_ID }}
           tenant-id: ${{ vars.AZURE_TENANT_ID }}
           subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
-      - name: Roll out trade MCP image
+
+      - name: Install AKS command extension
+        run: az extension add --name aks-preview --yes
+
+      - name: Apply manifests and roll out immutable image
+        env:
+          IMAGE_REF: ${{ env.IMAGE }}:sha-${{ github.sha }}
         run: |
           set -euo pipefail
-          az extension add --name aks-preview --yes
-          az aks command invoke \
-            --resource-group "${{ vars.AKS_RESOURCE_GROUP }}" \
-            --name "${{ vars.AKS_CLUSTER_NAME }}" \
-            --file deploy/production \
-            --command "set -e; kubectl apply -k deploy/production; kubectl -n trade-mcp get secret trade-mcp-env >/dev/null; kubectl -n trade-mcp get secret ghcr-registry-secret >/dev/null; kubectl -n trade-mcp set image deployment/trade-mcp trade-mcp=${IMAGE}:sha-${GITHUB_SHA}; kubectl -n trade-mcp rollout status deployment/trade-mcp --timeout=600s"
+          manifest_root="$(mktemp -d)"
+          trap 'rm -rf "${manifest_root}"' EXIT
+          mkdir -p "${manifest_root}/deploy/production"
+          cp deploy/production/*.yaml "${manifest_root}/deploy/production/"
+          sed -i "s#ghcr.io/yugalinks/yugalinks-trade-mcp:latest#${IMAGE_REF}#" "${manifest_root}/deploy/production/deployment.yaml"
+          cd "${manifest_root}"
+          succeeded=0
+          for attempt in 1 2 3 4 5; do
+            printf 'AKS command invoke attempt %s\n' "${attempt}"
+            if az aks command invoke \
+              --resource-group "${{ vars.AKS_RESOURCE_GROUP }}" \
+              --name "${{ vars.AKS_CLUSTER_NAME }}" \
+              --file . \
+              --command "set -eu; kubectl apply -f deploy/production/namespace.yaml; kubectl -n trade-mcp get secret trade-mcp-env >/dev/null; kubectl -n trade-mcp get secret ghcr-registry-secret >/dev/null; kubectl -n trade-service get secret trade-service-env >/dev/null; test -n \"\$(kubectl -n trade-mcp get secret trade-mcp-env -o jsonpath='{.data.TRADE_SERVICE_API_KEY}')\"; kubectl apply -k deploy/production; kubectl -n trade-mcp rollout status deployment/trade-mcp --timeout=600s; kubectl -n trade-mcp exec deployment/trade-mcp -- python -c 'import os,urllib.request; request=urllib.request.Request(os.environ[\"TRADE_SERVICE_URL\"]+\"/api/oecd/tables\",headers={\"x-api-key\":os.environ[\"TRADE_SERVICE_API_KEY\"]}); urllib.request.urlopen(request,timeout=10).close()'; workloads=\"\$(kubectl -n cloudflare get deployment,statefulset,daemonset -l app=cloudflared -o name)\"; test -n \"\${workloads}\"; for workload in \${workloads}; do kubectl -n cloudflare rollout restart \"\${workload}\"; kubectl -n cloudflare rollout status \"\${workload}\" --timeout=600s; done"; then
+              succeeded=1
+              break
+            fi
+            sleep 15
+          done
+          test "${succeeded}" = 1
+
+  configure-dns:
+    if: >-
+      (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
+      (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && inputs.deploy_production)
+    needs: deploy-production
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Ensure canonical Cloudflare DNS route
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ZONE_ID: ${{ vars.CLOUDFLARE_ZONE_ID }}
+          CLOUDFLARE_TUNNEL_ID: ${{ vars.CLOUDFLARE_TUNNEL_ID }}
+        run: |
+          set -euo pipefail
+          : "${CLOUDFLARE_API_TOKEN:?CLOUDFLARE_API_TOKEN is required}"
+          : "${CLOUDFLARE_ZONE_ID:?CLOUDFLARE_ZONE_ID is required}"
+          : "${CLOUDFLARE_TUNNEL_ID:?CLOUDFLARE_TUNNEL_ID is required}"
+
+          hostname="commerce-mcp.yugalinks.com"
+          target="${CLOUDFLARE_TUNNEL_ID}.cfargotunnel.com"
+          api="https://api.cloudflare.com/client/v4"
+          auth_header="Authorization: Bearer ${CLOUDFLARE_API_TOKEN}"
+          lookup="$(curl --fail --silent --show-error \
+            --get "${api}/zones/${CLOUDFLARE_ZONE_ID}/dns_records" \
+            -H "${auth_header}" \
+            --data-urlencode "name=${hostname}")"
+
+          record_count="$(jq '.result | length' <<<"${lookup}")"
+          test "${record_count}" -le 1
+          record_id="$(jq -r '.result[0].id // empty' <<<"${lookup}")"
+          existing_type="$(jq -r '.result[0].type // empty' <<<"${lookup}")"
+          if [ -n "${record_id}" ] && [ "${existing_type}" != "CNAME" ]; then
+            printf '%s\n' "A non-CNAME DNS record already exists for ${hostname}. Refusing to replace it." >&2
+            exit 1
+          fi
+
+          payload="$(jq -n \
+            --arg name "${hostname}" \
+            --arg content "${target}" \
+            '{type:"CNAME",name:$name,content:$content,ttl:1,proxied:true}')"
+          if [ -n "${record_id}" ]; then
+            response="$(curl --fail --silent --show-error \
+              --request PUT "${api}/zones/${CLOUDFLARE_ZONE_ID}/dns_records/${record_id}" \
+              -H "${auth_header}" \
+              -H 'Content-Type: application/json' \
+              --data "${payload}")"
+          else
+            response="$(curl --fail --silent --show-error \
+              --request POST "${api}/zones/${CLOUDFLARE_ZONE_ID}/dns_records" \
+              -H "${auth_header}" \
+              -H 'Content-Type: application/json' \
+              --data "${payload}")"
+          fi
+          jq -e '.success == true' <<<"${response}" >/dev/null
+          printf '%s\n' "Cloudflare DNS route is configured for ${hostname}."
+
+  public-preflight:
+    if: >-
+      (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
+      (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && inputs.deploy_production)
+    needs: configure-dns
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Run public HTTPS preflight
+        run: |
+          set -euo pipefail
+          for attempt in 1 2 3 4 5; do
+            printf 'Public preflight attempt %s\n' "${attempt}"
+            if python3 preflight.py --base-url https://commerce-mcp.yugalinks.com; then
+              exit 0
+            fi
+            sleep 30
+          done
+          exit 1
