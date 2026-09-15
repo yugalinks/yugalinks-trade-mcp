@@ -24,9 +24,10 @@ public HTTPS preflight. Use a push to `main`, or manually dispatch the workflow 
 The production GitHub environment must provide:
 
 - `GHCR_USERNAME` and `GHCR_PUSH_TOKEN` repository secrets.
-- `CLOUDFLARE_API_TOKEN` production environment secret with DNS edit permission for the zone.
+- Either `CLOUDFLARE_API_TOKEN` production environment secret with DNS edit permission, or
+  `CLOUDFLARE_EMAIL` and `CLOUDFLARE_GLOBAL_API_KEY` production environment secrets from the
+  private Cloudflare runtime.
 - `AZURE_CLIENT_ID`, `AZURE_TENANT_ID`, `AZURE_SUBSCRIPTION_ID`, `AKS_RESOURCE_GROUP`, and `AKS_CLUSTER_NAME` environment variables.
-- `CLOUDFLARE_ZONE_ID` and `CLOUDFLARE_TUNNEL_ID` production environment variables.
 - The existing `ghcr-registry-secret` and `trade-mcp-env` Kubernetes Secrets.
 - The existing `trade-service-env` Kubernetes Secret.
 - A `cloudflared` Deployment, StatefulSet, or DaemonSet in the `cloudflare` namespace labeled `app=cloudflared`.
