@@ -8,7 +8,7 @@ Public integration documentation: `https://www.yugalinks.com/docs/mcp`.
 
 ## Architecture Boundary
 
-`trade-mcp` is an independently deployable service. It does not require the Next.js webapp, authentication, or the AI service to run.
+`trade-mcp` is an independently deployable service. It does not require the Next.js webapp, authentication, or the analyst service to run.
 
 The MCP service deliberately uses `trade-service` as its private data adapter. This keeps ClickHouse credentials and query logic out of the public MCP boundary while allowing the MCP image, rate limits, deployment, and public URL to be managed separately. Making MCP query ClickHouse directly would be a separate architecture with duplicated query logic and a larger public-data security surface.
 

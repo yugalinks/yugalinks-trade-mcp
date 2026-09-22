@@ -22,11 +22,11 @@ For the broader product and competitor assessment, see [Competitive Landscape](.
 
 ### Short description
 
-Free, read-only OECD-backed cross-border commerce research for AI assistants: countries, HS products, approved commerce datasets, corridors, lane risk, and export opportunities.
+Free, read-only OECD-backed cross-border commerce research for research assistants: countries, HS products, approved commerce datasets, corridors, lane risk, and export opportunities.
 
 ### Full description
 
-Yugalinks Commerce Intelligence gives MCP-compatible AI clients bounded access to reported cross-border commerce research. Clients can look up countries and HS codes, discover all approved commerce-data dataset contracts, search up to eight named datasets at a time, compare global and country merchandise flows, inspect exporter-importer corridors, review lane-risk observations, and query calculated export-opportunity indicators. Some corridor and risk observations include market-access, tariff and FTA context. Responses include provider, dataset, edition, coverage and source links where available. The service is read-only and does not expose accounts, credentials, SQL, physical storage names or unrestricted bulk data. It is not a customs classification, tariff schedule, rules-of-origin or compliance service.
+Yugalinks Commerce Intelligence gives MCP-compatible research clients bounded access to reported cross-border commerce research. Clients can look up countries and HS codes, discover all approved commerce-data dataset contracts, search up to eight named datasets at a time, compare global and country merchandise flows, inspect exporter-importer corridors, review lane-risk observations, and query calculated export-opportunity indicators. Some corridor and risk observations include market-access, tariff and FTA context. Responses include provider, dataset, edition, coverage and source links where available. The service is read-only and does not expose accounts, credentials, SQL, physical storage names or unrestricted bulk data. It is not a customs classification, tariff schedule, rules-of-origin or compliance service.
 
 ### Example prompts
 

@@ -1,6 +1,6 @@
 # Directory Submission Brief
 
-This is the submission copy for directories and AI connector reviews. It is not a directory API payload and does not publish anything by itself.
+This is the submission copy for directories and connector reviews. It is not a directory API payload and does not publish anything by itself.
 
 See `docs/marketplace-submissions.md` for target directories, preflight checks and release order.
 
@@ -20,7 +20,7 @@ See `docs/marketplace-submissions.md` for target directories, preflight checks a
 
 ## Description
 
-Yugalinks Commerce Intelligence gives AI assistants free, read-only access to country, HS product, global merchandise flows, approved commerce datasets, corridors, lane-risk, and export-opportunity research. Some corridor and risk observations include market-access, tariff and FTA context. Results include provider and coverage context, and public lane-page links where available. The service does not expose accounts, private dashboards, credentials, SQL, physical storage names, or unrestricted bulk data. It is not a customs classification, tariff schedule, rules-of-origin or compliance service.
+Yugalinks Commerce Intelligence gives research assistants free, read-only access to country, HS product, global merchandise flows, approved commerce datasets, corridors, lane-risk, and export-opportunity research. Some corridor and risk observations include market-access, tariff and FTA context. Results include provider and coverage context, and public lane-page links where available. The service does not expose accounts, private dashboards, credentials, SQL, physical storage names, or unrestricted bulk data. It is not a customs classification, tariff schedule, rules-of-origin or compliance service.
 
 ## Tools
 
